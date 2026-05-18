@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 import javax.sql.DataSource;
+import java.net.URI;
 
 @Configuration
 public class DataSourceConfig {
@@ -18,20 +19,54 @@ public class DataSourceConfig {
     @Bean
     @Primary
     public DataSource dataSource() {
-        String jdbcUrl = toJdbcUrl(rawUrl);
-        HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(jdbcUrl);
-        config.setDriverClassName("org.postgresql.Driver");
-        config.setMaximumPoolSize(10);
-        config.setConnectionTimeout(20000);
-        return new HikariDataSource(config);
-    }
+        try {
+            String scheme = rawUrl;
+            if (scheme.startsWith("postgresql://") || scheme.startsWith("postgres://")) {
+                String uriStr = scheme
+                        .replace("postgresql://", "pg://")
+                        .replace("postgres://", "pg://");
+                URI uri = new URI(uriStr);
 
-    private String toJdbcUrl(String url) {
-        if (url == null) return url;
-        if (url.startsWith("jdbc:")) return url;
-        if (url.startsWith("postgresql://")) return "jdbc:" + url;
-        if (url.startsWith("postgres://")) return "jdbc:postgresql://" + url.substring("postgres://".length());
-        return url;
+                String userInfo = uri.getUserInfo();
+                String username = null;
+                String password = null;
+                if (userInfo != null) {
+                    String[] parts = userInfo.split(":", 2);
+                    username = parts[0];
+                    if (parts.length > 1) password = parts[1];
+                }
+
+                String host = uri.getHost();
+                int port = uri.getPort();
+                String path = uri.getPath();
+                String query = uri.getRawQuery();
+
+                String jdbcUrl = "jdbc:postgresql://" + host
+                        + (port > 0 ? ":" + port : "")
+                        + path
+                        + (query != null && !query.isEmpty() ? "?" + query : "");
+
+                HikariConfig config = new HikariConfig();
+                config.setJdbcUrl(jdbcUrl);
+                if (username != null) config.setUsername(username);
+                if (password != null) config.setPassword(password);
+                config.setDriverClassName("org.postgresql.Driver");
+                config.setMaximumPoolSize(10);
+                config.setConnectionTimeout(20000);
+                return new HikariDataSource(config);
+            }
+
+            // Already a JDBC URL
+            String jdbcUrl = rawUrl.startsWith("jdbc:") ? rawUrl : "jdbc:postgresql://" + rawUrl;
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(jdbcUrl);
+            config.setDriverClassName("org.postgresql.Driver");
+            config.setMaximumPoolSize(10);
+            config.setConnectionTimeout(20000);
+            return new HikariDataSource(config);
+
+        } catch (Exception e) {
+            throw new IllegalStateException("Could not configure DataSource from DATABASE_URL: " + e.getMessage(), e);
+        }
     }
 }

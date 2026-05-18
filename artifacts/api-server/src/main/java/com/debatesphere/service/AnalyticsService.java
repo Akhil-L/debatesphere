@@ -45,16 +45,14 @@ public class AnalyticsService {
     }
 
     public List<TrendingCategoryDto> getTrendingCategories() {
-        return debateRepository.findDistinctCategories().stream()
-                .map(cat -> {
-                    long debateCount = debateRepository.findWithFilters(cat, null,
-                            PageRequest.of(0, Integer.MAX_VALUE)).getTotalElements();
-                    long argCount = 0;
-                    List<Debate> debates = debateRepository.findWithFilters(cat, null,
-                            PageRequest.of(0, 100)).getContent();
-                    for (Debate d : debates) {
-                        argCount += argumentRepository.countByDebateId(d.getId());
-                    }
+        return debateRepository.findCategoryCountsNative().stream()
+                .map(row -> {
+                    String cat = (String) row[0];
+                    long debateCount = ((Number) row[1]).longValue();
+                    List<Debate> debates = debateRepository.findByCategoryNative(cat, 100);
+                    long argCount = debates.stream()
+                            .mapToLong(d -> argumentRepository.countByDebateId(d.getId()))
+                            .sum();
                     double score = debateCount * 10.0 + argCount * 2.0;
                     return new TrendingCategoryDto(cat, debateCount, argCount, score);
                 })

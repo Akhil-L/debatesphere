@@ -1,13 +1,12 @@
 package com.debatesphere.entity;
 
+import io.hypersistence.utils.hibernate.type.array.StringArrayType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.Array;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Type;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -30,9 +29,8 @@ public class Debate {
     @Column(nullable = false)
     private String category;
 
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Array(length = 50)
-    @Column(nullable = false, columnDefinition = "text[]")
+    @Type(StringArrayType.class)
+    @Column(name = "tags", columnDefinition = "text[]")
     private String[] tags = new String[0];
 
     @Column(nullable = false)

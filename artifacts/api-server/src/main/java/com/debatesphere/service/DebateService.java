@@ -16,9 +16,6 @@ import com.debatesphere.repository.DebateRepository;
 import com.debatesphere.repository.ParticipantRepository;
 import com.debatesphere.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,37 +31,31 @@ public class DebateService {
     private final ArgumentRepository argumentRepository;
     private final ParticipantRepository participantRepository;
 
+    @Transactional(readOnly = true)
     public DebateListDto listDebates(String category, String search, String sort, int limit, int offset) {
-        Sort sortBy = switch (sort != null ? sort : "latest") {
-            case "trending" -> Sort.by(Sort.Direction.DESC, "viewCount");
-            case "most_active" -> Sort.by(Sort.Direction.DESC, "viewCount");
-            default -> Sort.by(Sort.Direction.DESC, "createdAt");
-        };
-        int page = limit > 0 ? offset / limit : 0;
-        PageRequest pageRequest = PageRequest.of(page, limit > 0 ? limit : 20, sortBy);
-        Page<Debate> dbPage = debateRepository.findWithFilters(
-                (category != null && !category.isBlank()) ? category : null,
-                (search != null && !search.isBlank()) ? search : null,
-                pageRequest);
+        String cat = (category != null && !category.isBlank()) ? category : null;
+        String q = (search != null && !search.isBlank()) ? search : null;
+        int lim = limit > 0 ? limit : 20;
 
-        List<DebateDto> dtos = dbPage.getContent().stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
-        return new DebateListDto(dtos, dbPage.getTotalElements());
+        boolean trending = "trending".equals(sort) || "most_active".equals(sort);
+        List<Debate> debates = trending
+                ? debateRepository.findWithFiltersTrending(cat, q, lim, offset)
+                : debateRepository.findWithFiltersLatest(cat, q, lim, offset);
+        long total = debateRepository.countWithFilters(cat, q);
+
+        List<DebateDto> dtos = debates.stream().map(this::toDto).collect(Collectors.toList());
+        return new DebateListDto(dtos, total);
     }
 
+    @Transactional(readOnly = true)
     public List<DebateDto> getTrending(int limit) {
         return debateRepository.findTrending(limit > 0 ? limit : 5)
                 .stream().map(this::toDto).collect(Collectors.toList());
     }
 
     public List<CategoryDto> getCategories() {
-        return debateRepository.findDistinctCategories().stream()
-                .map(cat -> {
-                    long count = debateRepository.findWithFilters(cat, null,
-                            PageRequest.of(0, Integer.MAX_VALUE)).getTotalElements();
-                    return new CategoryDto(cat, count);
-                })
+        return debateRepository.findCategoryCountsNative().stream()
+                .map(row -> new CategoryDto((String) row[0], ((Number) row[1]).longValue()))
                 .collect(Collectors.toList());
     }
 
@@ -146,8 +137,7 @@ public class DebateService {
     }
 
     private DebateDto toDto(Debate debate) {
-        User author = debate.getAuthor() != null ? debate.getAuthor()
-                : userRepository.findById(debate.getAuthorId()).orElse(null);
+        User author = userRepository.findById(debate.getAuthorId()).orElse(null);
         return toDto(debate, author);
     }
 
