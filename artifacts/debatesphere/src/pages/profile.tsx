@@ -14,7 +14,7 @@ export default function Profile() {
     query: { enabled: !!userId, queryKey: ['getUser', userId] }
   });
 
-  const { data: debatesData, isLoading: isDebatesLoading } = useGetUserDebates(userId, {
+  const { data: debates, isLoading: isDebatesLoading } = useGetUserDebates(userId, {
     query: { enabled: !!userId, queryKey: ['getUserDebates', userId] }
   });
 
@@ -103,13 +103,13 @@ export default function Profile() {
           
           {isDebatesLoading ? (
             <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-          ) : debatesData?.debates.length === 0 ? (
+          ) : !debates?.length ? (
             <div className="text-center py-10 bg-card rounded-xl border border-border/50 text-muted-foreground">
               This user hasn't started any debates yet.
             </div>
           ) : (
             <div className="space-y-4">
-              {debatesData?.debates.map((debate) => (
+              {debates.map((debate) => (
                 <Link key={debate.id} href={`/debate/${debate.id}`}>
                   <div className="group bg-card border border-border hover:border-primary/50 transition-all rounded-xl p-5 cursor-pointer">
                     <div className="flex justify-between items-start mb-2">

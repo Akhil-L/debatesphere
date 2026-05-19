@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: debatesphere-api
+    runtime: java
+    buildCommand: cd artifacts/api-server && mvn package -DskipTests
+    startCommand: java -jar artifacts/api-server/target/debatesphere-api.jar
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: debatesphere-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+
+  - type: web
+    name: debatesphere-frontend
+    runtime: static
+    buildCommand: pnpm install && BASE_PATH=/ pnpm --filter @workspace/debatesphere run build
+    staticPublishPath: artifacts/debatesphere/dist/public
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: BASE_PATH
+        value: /
+
+databases:
+  - name: debatesphere-db
+    databaseName: debatesphere
+    user: debatesphere

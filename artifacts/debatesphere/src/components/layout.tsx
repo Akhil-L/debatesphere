@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { MessageSquareShare, BarChart3, Trophy, User as UserIcon, LogOut, Loader2 } from "lucide-react";
-import { useGetMe } from "@workspace/api-client-react";
+import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, logout, setUser, token } = useAuth();
@@ -11,6 +11,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const { data: user, isLoading } = useGetMe({
     query: {
+      queryKey: getGetMeQueryKey(),
       enabled: isAuthenticated && !!token,
       staleTime: 5 * 60 * 1000,
     }
