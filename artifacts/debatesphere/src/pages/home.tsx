@@ -19,8 +19,9 @@ import {
   Filter, 
   Plus, 
   Search,
-  Eye,
-  Loader2
+  Loader2,
+  Share2,
+  Check
 } from "lucide-react";
 import {
   Dialog,
@@ -57,6 +58,7 @@ export default function Home() {
   const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const { data: debatesData, isLoading: isDebatesLoading } = useListDebates({
     category: activeCategory,
@@ -79,6 +81,16 @@ export default function Home() {
       tags: "",
     },
   });
+
+  const handleShare = (e: React.MouseEvent, debateId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = `${window.location.origin}/debate/${debateId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(debateId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
 
   const onSubmit = (values: z.infer<typeof debateSchema>) => {
     const tagsArray = values.tags ? values.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
@@ -282,11 +294,24 @@ export default function Home() {
                         {formatDistanceToNow(new Date(debate.createdAt), { addSuffix: true })}
                       </span>
                     </div>
-                    {debate.status === 'active' ? (
-                      <Badge variant="outline" className="text-primary border-primary/30">Active</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-muted-foreground">Closed</Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {debate.status === 'active' ? (
+                        <Badge variant="outline" className="text-primary border-primary/30">Active</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">Closed</Badge>
+                      )}
+                      <button
+                        onClick={(e) => handleShare(e, debate.id)}
+                        className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                        title="Share debate"
+                      >
+                        {copiedId === debate.id ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <Share2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   
                   <h2 className="text-xl sm:text-2xl font-bold mb-2 group-hover:text-primary transition-colors line-clamp-2">

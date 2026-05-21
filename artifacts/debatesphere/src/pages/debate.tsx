@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import {
   useGetDebate,
@@ -27,7 +27,9 @@ import {
   Users, 
   Send,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Share2,
+  Check
 } from "lucide-react";
 import {
   Form,
@@ -56,9 +58,11 @@ export default function Debate() {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   
   const [activeTab, setActiveTab] = useState<"all" | "for" | "against" | "neutral">("all");
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { data: debate, isLoading: isDebateLoading, error: debateError } = useGetDebate(debateId, {
     query: { enabled: !!debateId, queryKey: ['getDebate', debateId] }
@@ -72,53 +76,66 @@ export default function Debate() {
   const createArgumentMutation = useCreateArgument();
   const voteArgumentMutation = useVoteArgument();
 
-  // Join debate on load if authenticated
   useEffect(() => {
     if (isAuthenticated && debateId) {
       joinDebateMutation.mutate({ id: debateId }, {
-        onError: () => {
-          // Already joined or failed, ignore silently
-        }
+        onError: () => {}
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, debateId]);
 
-  // WebSocket Connection
   useEffect(() => {
     if (!debateId) return;
-
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/api/ws?debateId=${debateId}`;
     let ws: WebSocket;
-
     const connect = () => {
       ws = new WebSocket(wsUrl);
-      
-      ws.onmessage = (event) => {
-        // Any message means we should refresh arguments
+      ws.onmessage = () => {
         queryClient.invalidateQueries({ queryKey: getListArgumentsQueryKey(debateId) });
       };
-
-      ws.onclose = () => {
-        // Optional reconnect logic could go here
-      };
     };
-
     connect();
-
-    return () => {
-      if (ws) ws.close();
-    };
+    return () => { if (ws) ws.close(); };
   }, [debateId, queryClient]);
 
   const form = useForm<z.infer<typeof argumentSchema>>({
     resolver: zodResolver(argumentSchema),
-    defaultValues: {
-      content: "",
-      stance: "neutral",
-    },
+    defaultValues: { content: "", stance: "neutral" },
   });
+
+  const handleShare = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({ title: "Link copied!", description: "Share it with your friends." });
+    });
+  };
+
+  const handleVote = (argumentId: number, voteType: "up" | "down" | "none") => {
+    voteArgumentMutation.mutate({
+      id: argumentId,
+      data: { vote: voteType }
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListArgumentsQueryKey(debateId) });
+        if (!isAuthenticated) {
+          toast({
+            title: "Vote recorded! 🎉",
+            description: "Join DebateSphere to track your votes and post arguments.",
+          });
+        }
+      },
+      onError: () => {
+        toast({
+          title: "Already voted",
+          description: "You have already voted on this argument.",
+          variant: "destructive"
+        });
+      }
+    });
+  };
 
   const onArgumentSubmit = (values: z.infer<typeof argumentSchema>) => {
     if (!isAuthenticated) {
@@ -129,7 +146,6 @@ export default function Debate() {
       });
       return;
     }
-
     createArgumentMutation.mutate({
       id: debateId,
       data: values
@@ -138,25 +154,6 @@ export default function Debate() {
         form.reset();
         queryClient.invalidateQueries({ queryKey: getListArgumentsQueryKey(debateId) });
         toast({ title: "Argument posted!" });
-      }
-    });
-  };
-
-  const handleVote = (argumentId: number, voteType: "up" | "down" | "none") => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Login Required",
-        description: "You must be logged in to vote.",
-        variant: "destructive"
-      });
-      return;
-    }
-    voteArgumentMutation.mutate({
-      id: argumentId,
-      data: { vote: voteType }
-    }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListArgumentsQueryKey(debateId) });
       }
     });
   };
@@ -192,6 +189,15 @@ export default function Debate() {
             <span className="flex items-center gap-1">
               <MessageSquare className="w-4 h-4" /> {debate.argumentCount}
             </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleShare}
+              className="flex items-center gap-1.5 text-xs"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Share2 className="w-3.5 h-3.5" />}
+              {copied ? "Copied!" : "Share"}
+            </Button>
           </div>
         </div>
         
@@ -214,8 +220,22 @@ export default function Debate() {
         </div>
       </div>
 
+      {/* Guest CTA Banner */}
+      {!isAuthenticated && (
+        <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex items-center justify-between">
+          <div>
+            <p className="font-bold text-sm">You're viewing as a guest</p>
+            <p className="text-xs text-muted-foreground">Join to post arguments, reply, and track your reputation</p>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => setLocation("/login")}>Login</Button>
+            <Button size="sm" onClick={() => setLocation("/register")}>Join Free</Button>
+          </div>
+        </div>
+      )}
+
       {/* Argument Input */}
-      {debate.status === 'active' && (
+      {debate.status === 'active' && isAuthenticated && (
         <div className="bg-card border border-border/50 rounded-xl p-6">
           <h3 className="text-lg font-bold mb-4">Add Your Voice</h3>
           <Form {...form}>
@@ -228,30 +248,9 @@ export default function Debate() {
                     <FormLabel>Your Stance</FormLabel>
                     <FormControl>
                       <div className="flex gap-2">
-                        <Button 
-                          type="button" 
-                          variant={field.value === "for" ? "default" : "outline"} 
-                          onClick={() => field.onChange("for")}
-                          className={field.value === "for" ? "bg-primary text-primary-foreground" : ""}
-                        >
-                          For
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant={field.value === "against" ? "default" : "outline"} 
-                          onClick={() => field.onChange("against")}
-                          className={field.value === "against" ? "bg-destructive text-destructive-foreground" : ""}
-                        >
-                          Against
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant={field.value === "neutral" ? "default" : "outline"} 
-                          onClick={() => field.onChange("neutral")}
-                          className={field.value === "neutral" ? "bg-secondary text-secondary-foreground" : ""}
-                        >
-                          Neutral
-                        </Button>
+                        <Button type="button" variant={field.value === "for" ? "default" : "outline"} onClick={() => field.onChange("for")}>For</Button>
+                        <Button type="button" variant={field.value === "against" ? "default" : "outline"} onClick={() => field.onChange("against")} className={field.value === "against" ? "bg-destructive text-destructive-foreground" : ""}>Against</Button>
+                        <Button type="button" variant={field.value === "neutral" ? "default" : "outline"} onClick={() => field.onChange("neutral")} className={field.value === "neutral" ? "bg-secondary text-secondary-foreground" : ""}>Neutral</Button>
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -264,11 +263,7 @@ export default function Debate() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Textarea 
-                        placeholder="Construct a well-reasoned argument..." 
-                        className="resize-none min-h-[100px]" 
-                        {...field} 
-                      />
+                      <Textarea placeholder="Construct a well-reasoned argument..." className="resize-none min-h-[100px]" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -291,15 +286,7 @@ export default function Debate() {
           <h2 className="text-2xl font-bold">Arguments</h2>
           <div className="flex gap-2">
             {(["all", "for", "against", "neutral"] as const).map(tab => (
-              <Button 
-                key={tab} 
-                variant={activeTab === tab ? "default" : "ghost"} 
-                size="sm"
-                onClick={() => setActiveTab(tab)}
-                className="capitalize"
-              >
-                {tab}
-              </Button>
+              <Button key={tab} variant={activeTab === tab ? "default" : "ghost"} size="sm" onClick={() => setActiveTab(tab)} className="capitalize">{tab}</Button>
             ))}
           </div>
         </div>
@@ -308,7 +295,7 @@ export default function Debate() {
           <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
         ) : filteredArguments.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground">
-            No arguments posted yet in this category. Be the first!
+            No arguments posted yet. {isAuthenticated ? "Be the first!" : "Login to post the first argument!"}
           </div>
         ) : (
           <div className="space-y-4">
@@ -333,9 +320,7 @@ export default function Debate() {
                   </Badge>
                 </div>
                 
-                <p className="whitespace-pre-wrap mb-4">
-                  {arg.content}
-                </p>
+                <p className="whitespace-pre-wrap mb-4">{arg.content}</p>
 
                 <div className="flex items-center justify-between pt-2">
                   <div className="flex items-center gap-1">
@@ -359,13 +344,15 @@ export default function Debate() {
                     </Button>
                   </div>
                   
-                  <Button variant="ghost" size="sm" onClick={() => setReplyingTo(replyingTo === arg.id ? null : arg.id)}>
-                    <MessageSquare className="w-4 h-4 mr-1.5" />
-                    Reply ({arg.replyCount})
-                  </Button>
+                  {isAuthenticated && (
+                    <Button variant="ghost" size="sm" onClick={() => setReplyingTo(replyingTo === arg.id ? null : arg.id)}>
+                      <MessageSquare className="w-4 h-4 mr-1.5" />
+                      Reply ({arg.replyCount})
+                    </Button>
+                  )}
                 </div>
 
-                {replyingTo === arg.id && (
+                {replyingTo === arg.id && isAuthenticated && (
                   <RepliesSection argumentId={arg.id} />
                 )}
               </div>
