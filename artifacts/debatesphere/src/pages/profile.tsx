@@ -55,8 +55,10 @@ export default function Profile() {
         body: JSON.stringify({ username: editUsername, bio: editBio }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to update profile");
+        const text = await res.text();
+        let message = "Failed to update profile";
+        try { message = JSON.parse(text).message || message; } catch {}
+        throw new Error(message);
       }
       queryClient.invalidateQueries({ queryKey: ['getUser', userId] });
       setIsEditing(false);
