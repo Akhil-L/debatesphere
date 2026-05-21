@@ -40,11 +40,14 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/register", "/auth/login").permitAll()
-                .requestMatchers("/healthz").permitAll()
+                .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
+                .requestMatchers("/healthz", "/api/healthz").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.GET, "/debates/**", "/arguments/**", "/users/**",
                         "/analytics/**", "/votes/**").permitAll()
-                .requestMatchers("/ws", "/ws/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/debates/**", "/api/arguments/**", "/api/users/**",
+                        "/api/analytics/**", "/api/votes/**").permitAll()
+                .requestMatchers("/ws", "/ws/**", "/api/ws", "/api/ws/**").permitAll()
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())
