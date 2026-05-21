@@ -6,7 +6,6 @@ import com.debatesphere.entity.Argument;
 import com.debatesphere.entity.User;
 import com.debatesphere.entity.Vote;
 import com.debatesphere.exception.ResourceNotFoundException;
-import com.debatesphere.exception.UnauthorizedException;
 import com.debatesphere.repository.ArgumentRepository;
 import com.debatesphere.repository.UserRepository;
 import com.debatesphere.repository.VoteRepository;
@@ -25,14 +24,18 @@ public class VoteService {
     private final UserRepository userRepository;
 
     @Transactional
-    public VoteResultDto vote(Long argumentId, Long userId, VoteRequest req) {
+    public VoteResultDto vote(Long argumentId, Long userId, String ipAddress, VoteRequest req) {
         Argument arg = argumentRepository.findById(argumentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Argument not found"));
         User argAuthor = userRepository.findById(arg.getAuthorId()).orElseThrow();
 
-        Optional<Vote> existingOpt = voteRepository.findByUserIdAndArgumentId(userId, argumentId);
+        Optional<Vote> existingOpt;
+        if (userId != null) {
+            existingOpt = voteRepository.findByUserIdAndArgumentId(userId, argumentId);
+        } else {
+            existingOpt = voteRepository.findByIpAddressAndArgumentId(ipAddress, argumentId);
+        }
 
-        String oldVote = existingOpt.map(Vote::getVote).orElse(null);
         String newVote = req.getVote();
 
         if ("none".equals(newVote)) {
@@ -52,6 +55,7 @@ public class VoteService {
             vote.setUserId(userId);
             vote.setArgumentId(argumentId);
             vote.setVote(newVote);
+            vote.setIpAddress(ipAddress);
             voteRepository.save(vote);
             adjustCounts(arg, argAuthor, null, newVote);
         }

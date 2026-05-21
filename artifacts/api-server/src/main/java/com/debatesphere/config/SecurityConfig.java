@@ -47,6 +47,7 @@ public class SecurityConfig {
                         "/analytics/**", "/votes/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/debates/**", "/api/arguments/**", "/api/users/**",
                         "/api/analytics/**", "/api/votes/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/votes/argument/**", "/api/votes/argument/**").permitAll()
                 .requestMatchers("/ws", "/ws/**", "/api/ws", "/api/ws/**").permitAll()
                 .anyRequest().authenticated()
             )

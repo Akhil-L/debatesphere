@@ -9,7 +9,10 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "votes",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "argument_id"}))
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "argument_id"}),
+        @UniqueConstraint(columnNames = {"ip_address", "argument_id"})
+    })
 @Getter
 @Setter
 public class Vote {
@@ -18,7 +21,7 @@ public class Vote {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -34,6 +37,9 @@ public class Vote {
 
     @Column(nullable = false)
     private String vote;
+
+    @Column(name = "ip_address")
+    private String ipAddress;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
