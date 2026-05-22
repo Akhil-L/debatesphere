@@ -46,6 +46,7 @@ export default function Profile() {
     setError("");
     try {
       const token = localStorage.getItem("token");
+      const apiBase = import.meta.env.VITE_API_URL ?? "";
       const res = await fetch(`/api/users/${userId}`, {
         method: "PUT",
         headers: {
