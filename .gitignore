@@ -41,13 +41,6 @@ testem.log
 .DS_Store
 Thumbs.db
 
-.cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
-
-# Replit
-.cache/
-.local/
-
 # Environment variables
 .env
 .env.local
@@ -55,7 +48,8 @@ Thumbs.db
 
 # Java compiled output
 artifacts/api-server/target/
-# Cleanup unnecessary files
+
+# Ignored files
 artifacts/mockup-sandbox/
 artifacts/api-server/src/routes/
 artifacts/api-server/src/middlewares/
