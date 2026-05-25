@@ -55,3 +55,14 @@ Thumbs.db
 
 # Java compiled output
 artifacts/api-server/target/
+# Cleanup unnecessary files
+artifacts/mockup-sandbox/
+artifacts/api-server/src/routes/
+artifacts/api-server/src/middlewares/
+artifacts/api-server/src/lib/
+artifacts/api-server/src/app.ts
+artifacts/api-server/src/index.ts
+artifacts/api-server/build.mjs
+artifacts/api-server/tsconfig.json
+.replit-artifact/
+artifact.toml
